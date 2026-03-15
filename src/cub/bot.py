@@ -135,8 +135,8 @@ class TelegramAssistantBot:
                 BotCommand("tasks", "List recent tasks"),
                 BotCommand("cancel", "Cancel a running task"),
                 BotCommand("killall", "Kill all Claude Code processes"),
-                BotCommand("mute", "Mute progress updates"),
-                BotCommand("unmute", "Unmute progress updates"),
+                BotCommand("mute", "Background tasks are already quiet"),
+                BotCommand("unmute", "Background tasks stay quiet"),
                 BotCommand("newsession", "Reset front assistant memory session"),
                 BotCommand("remind", "Set a status reminder"),
                 BotCommand("help", "Show help"),
@@ -206,8 +206,8 @@ class TelegramAssistantBot:
             "/tasks - list recent tasks\n"
             "/cancel [task_id] [--force] - cancel latest/running task\n"
             "/killall [--graceful] - kill Claude Code processes on this machine\n"
-            "/mute - mute progress updates in this chat\n"
-            "/unmute - resume progress updates in this chat\n"
+            "/mute - compatibility no-op; tasks are already quiet by default\n"
+            "/unmute - compatibility no-op; ask for /status anytime\n"
             "/newsession - reset front assistant memory session\n"
             "/remind <task_id> <when> [note] - schedule reminder\n"
             "\n"
@@ -215,7 +215,8 @@ class TelegramAssistantBot:
             "\n"
             "Tips:\n"
             "- Sending plain text is equivalent to /run <text>\n"
-            "- Natural language controls work too: 'cancel task', 'kill task ab12cd34', 'mute updates', 'check task ab12cd34', 'continue task ab12cd34 add e2e tests'.\n"
+            "- Natural language controls work too: 'cancel task', 'kill task ab12cd34', 'check task ab12cd34', 'continue task ab12cd34 add e2e tests'.\n"
+            "- Background tasks only send the final result automatically. Ask for /status whenever you want an update.\n"
             "- Use /killall if Claude processes are stuck and you need machine cleanup."
         )
 
@@ -415,7 +416,11 @@ class TelegramAssistantBot:
             return
 
         self.store.set_updates_muted(chat.id, True)
-        await self._send_reply(message, chat.id, "Progress updates muted for this chat. Running tasks keep going.")
+        await self._send_reply(
+            message,
+            chat.id,
+            "Background tasks are already quiet by default. I’ll still send the final result here.",
+        )
 
     async def cmd_unmute(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         if not await self._authorize(update):
@@ -427,7 +432,11 @@ class TelegramAssistantBot:
             return
 
         self.store.set_updates_muted(chat.id, False)
-        await self._send_reply(message, chat.id, "Progress updates unmuted for this chat.")
+        await self._send_reply(
+            message,
+            chat.id,
+            "Auto progress updates stay off. Ask for /status anytime, and I’ll still send the final result here.",
+        )
 
     async def cmd_newsession(self, update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
         if not await self._authorize(update):
@@ -604,7 +613,7 @@ class TelegramAssistantBot:
         lines = [f"Queued task {task['id']} ({label})."]
         if session_id:
             lines.append(f"Session id: {session_id}")
-        lines.append("I will post progress updates and final result here.")
+        lines.append("I’ll send the final result here. If you want an update before then, ask for status.")
         await self._send_reply(
             message,
             chat.id,
@@ -671,13 +680,17 @@ class TelegramAssistantBot:
             await self._send_reply(
                 message,
                 chat.id,
-                "Progress updates muted for this chat. Running tasks are not canceled.",
+                "Background tasks are already quiet by default. I’ll still send the final result here.",
             )
             return True
 
         if intent.action == "unmute_updates":
             self.store.set_updates_muted(chat.id, False)
-            await self._send_reply(message, chat.id, "Progress updates unmuted for this chat.")
+            await self._send_reply(
+                message,
+                chat.id,
+                "Auto progress updates stay off. Ask for /status anytime, and I’ll still send the final result here.",
+            )
             return True
 
         if intent.action == "probe_task":

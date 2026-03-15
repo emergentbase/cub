@@ -45,7 +45,8 @@ Then open Telegram and send:
 ## How It Behaves
 
 - Simple questions: quick direct reply.
-- Work that needs tools/files/shell: queued task with progress + completion updates.
+- Work that needs tools/files/shell: queued task with a final completion update.
+- If you want an update before it finishes, ask for status.
 - You can keep chatting while tasks run.
 
 ## Example Conversation
@@ -58,10 +59,7 @@ You: add 5 to it
 Cub: 19
 
 You: create a chat app like WhatsApp with seed data (full-stack)
-Cub: Queued task b709652a (...). I will post progress updates and final result here.
-Cub: Task b709652a in progress:
-- Planning project structure
-- Creating backend + frontend scaffolding
+Cub: Queued task b709652a (...). I’ll send the final result here. If you want an update before then, ask for status.
 
 You: add 5 to the previous calc
 Cub: 24
@@ -100,12 +98,12 @@ Notes:
 | `/tasks` | Show recent tasks |
 | `/cancel [id] [--force]` | Cancel a task |
 | `/killall [--graceful]` | Kill Claude Code processes on the machine |
-| `/mute` / `/unmute` | Mute/unmute progress updates |
+| `/mute` / `/unmute` | Compatibility no-op; tasks are already quiet |
 | `/newsession` | Reset fast assistant chat session |
 | `/remind <task_id> <when> [note]` | Set reminder |
 
 Natural language controls also work:
-`cancel task`, `kill task ab12cd34`, `mute updates`, `check task ab12cd34`,
+`cancel task`, `kill task ab12cd34`, `check task ab12cd34`,
 `continue task ab12cd34 add e2e tests`.
 
 ## Run Multiple Bots on One Machine

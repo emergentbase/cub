@@ -1,4 +1,4 @@
-"""Async Claude CLI task execution with progress callbacks."""
+"""Async Claude CLI task execution with quiet background runs."""
 
 from __future__ import annotations
 
@@ -31,7 +31,6 @@ class _RunningTask:
     process: asyncio.subprocess.Process
     chat_id: int
     pending_snippets: list[str] = field(default_factory=list)
-    last_progress_summary: str | None = None
 
 
 @dataclass(frozen=True)
@@ -191,8 +190,6 @@ class ClaudeTaskRunner:
     async def _run_task(self, task_id: str, command_parts: list[str], cwd: Path) -> None:
         chat_id = None
         process: asyncio.subprocess.Process | None = None
-        progress_task: asyncio.Task[None] | None = None
-
         try:
             process = await asyncio.create_subprocess_exec(
                 *command_parts,
@@ -237,8 +234,6 @@ class ClaudeTaskRunner:
 
         reader_out = asyncio.create_task(self._read_stream(task_id, process.stdout, context, "stdout"))
         reader_err = asyncio.create_task(self._read_stream(task_id, process.stderr, context, "stderr"))
-        progress_task = asyncio.create_task(self._progress_loop(task_id, context))
-
         try:
             return_code = await process.wait()
             await asyncio.gather(reader_out, reader_err)
@@ -256,9 +251,6 @@ class ClaudeTaskRunner:
             await asyncio.gather(reader_out, reader_err, return_exceptions=True)
             raise
         finally:
-            if progress_task:
-                progress_task.cancel()
-                await asyncio.gather(progress_task, return_exceptions=True)
             self._running.pop(task_id, None)
 
         post = self.store.get_task(task_id)
@@ -336,34 +328,6 @@ class ClaudeTaskRunner:
                 if len(context.pending_snippets) > 40:
                     context.pending_snippets = context.pending_snippets[-20:]
 
-    async def _progress_loop(self, task_id: str, context: _RunningTask) -> None:
-        interval = self.settings.progress_update_seconds
-        while True:
-            await asyncio.sleep(interval)
-            if self.store.updates_muted(context.chat_id):
-                context.pending_snippets.clear()
-                continue
-
-            if not context.pending_snippets:
-                continue
-
-            batch = _compact_progress_batch(context.pending_snippets)
-            context.pending_snippets.clear()
-            if not batch:
-                continue
-
-            summary = "\n".join(f"- {line}" for line in batch)
-            if self._progress_rewriter:
-                rewritten = await self._progress_rewriter(task_id, batch)
-                if rewritten:
-                    summary = rewritten
-
-            if context.last_progress_summary == summary:
-                continue
-
-            context.last_progress_summary = summary
-            await self.send_message(context.chat_id, f"Task {task_id} in progress:\n{summary}")
-
     def _resolve_cwd(self, working_dir: str | None) -> Path:
         if not working_dir:
             return self.settings.workspace_dir
@@ -377,20 +341,6 @@ class ClaudeTaskRunner:
         if not path.exists() or not path.is_dir():
             raise ValueError(f"working directory not found: {path}")
         return path
-
-
-def _compact_progress_batch(snippets: list[str], *, max_lines: int = 3) -> list[str]:
-    compact: list[str] = []
-    for item in snippets[-8:]:
-        text = item.strip()
-        if not text:
-            continue
-        if text not in compact:
-            compact.append(text)
-    if not compact:
-        return []
-    return compact[-max_lines:]
-
 
 def _collect_final_snippets(events: list[dict[str, Any]], *, max_lines: int) -> list[str]:
     lines: list[str] = []
