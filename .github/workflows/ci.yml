@@ -6,12 +6,12 @@ on:
 
 jobs:
   preflight:
-    runs-on: arc-runner-dev-amd64
+    runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
       - name: Verify runner availability
         run: |
-          echo "ARC runner arc-runner-dev-amd64 is available"
+          echo "Preflight OK (hosted runner)"
           echo "Runner: $(uname -s) $(uname -m)"
 
   test:
