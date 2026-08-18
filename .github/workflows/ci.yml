@@ -5,8 +5,18 @@ on:
   pull_request:
 
 jobs:
+  preflight:
+    runs-on: arc-runner-dev-amd64
+    timeout-minutes: 2
+    steps:
+      - name: Verify runner availability
+        run: |
+          echo "ARC runner arc-runner-dev-amd64 is available"
+          echo "Runner: $(uname -s) $(uname -m)"
+
   test:
-    runs-on: ubuntu-latest
+    needs: [preflight]
+    runs-on: arc-runner-dev-amd64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
